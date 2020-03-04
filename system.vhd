@@ -150,7 +150,7 @@ begin
         variable V_packet_transfer 	    : boolean;   -- TRUE if packet transfer in progress
         variable V_correct_packet_type  : boolean;   -- TRUE if packet has a matching pattern
         variable V_incompatible_len     : boolean;   -- TRUE if packet length too short to include pattern
-		variable V_data_to_check	: std_logic_vector(127 downto 0);
+	variable V_data_to_check	: std_logic_vector(127 downto 0);
         variable V_output_buffer    : std_logic_vector(OUT_BUFFER'range);
     begin
         if nRESET = '0' then
@@ -166,7 +166,7 @@ begin
             PACKET_CYCLE_CNT        <= (others => '0');
             V_data_to_check         := (others => '0');
             V_packet_transfer       := FALSE;
-			V_correct_packet_type   := FALSE;
+	    V_correct_packet_type   := FALSE;
             V_incompatible_len      := FALSE;
             V_output_buffer         := (others => '0');
 
@@ -180,98 +180,98 @@ begin
             OUT_DATA        <= IN_DATA_RR;
             OUT_BUFFER      <= (others => '0');
 
-			-- If Message start then latch packet transfer to TRUE
-			if IN_SOP_RR = '1' then
-				V_packet_transfer 	:= TRUE;
-			end if;
-			
-			-- If packet transfer in progress and valid packet cycle arrives
-			if (V_packet_transfer = TRUE) and (IN_VALID_RR = '1')  then
-				-- Increment Packet Cycle Counter
-				PACKET_CYCLE_CNT <= PACKET_CYCLE_CNT + 1;
+		-- If Message start then latch packet transfer to TRUE
+		if IN_SOP_RR = '1' then
+			V_packet_transfer 	:= TRUE;
+		end if;
 
-				-- Check if relevant packet cycle
-				case (PACKET_CYCLE_CNT) is
+		-- If packet transfer in progress and valid packet cycle arrives
+		if (V_packet_transfer = TRUE) and (IN_VALID_RR = '1')  then
+		    -- Increment Packet Cycle Counter
+		    PACKET_CYCLE_CNT <= PACKET_CYCLE_CNT + 1;
+
+		    -- Check if relevant packet cycle
+		    case (PACKET_CYCLE_CNT) is
 				
                     -- Check for packet type 
-					when C_packet_type_offset_word_uns =>
+			when C_packet_type_offset_word_uns =>
                         -- If Length of this data word is not long enough to include Packet Type. Pattern cannot match
-						if ((C_packet_type_limit_hi + 1) > (to_integer(unsigned(IN_LENGTH_RR)) * 8)) and (unsigned(IN_LENGTH_RR) > 0) then
-                            V_incompatible_len := TRUE;
-                        else
-                            --Check for matching packet type
-                            if IN_DATA_RR(C_packet_type_limit_hi downto C_packet_type_limit_lo) = C_packet_type then
-                                V_correct_packet_type := TRUE;
+			    if ((C_packet_type_limit_hi + 1) > (to_integer(unsigned(IN_LENGTH_RR)) * 8)) and (unsigned(IN_LENGTH_RR) > 0) then
+                                V_incompatible_len := TRUE;
                             else
-                                V_correct_packet_type := FALSE;
+                                --Check for matching packet type
+                                if IN_DATA_RR(C_packet_type_limit_hi downto C_packet_type_limit_lo) = C_packet_type then
+                                    V_correct_packet_type := TRUE;
+                                else
+                                    V_correct_packet_type := FALSE;
+                                end if;
                             end if;
-                        end if;
 						
-					-- Collect First half of pattern
-					when C_symbol_offset_word_uns =>
-                        -- If whole word is pattern and length is non-zero. Pattern cannot match. 
-                        --      This is necessary incase missing bytes of pattern are all zeros
-                        if (C_symbol_offset_limit_lo = 0) and (unsigned(IN_LENGTH_RR) > 0) then
-                            V_incompatible_len := TRUE;
-                        else
-                            V_data_to_check( 63 downto  0) := IN_DATA_RR;
-                        end if;
+			-- Collect First half of pattern
+			when C_symbol_offset_word_uns =>
+                            -- If whole word is pattern and length is non-zero. Pattern cannot match. 
+                            --      This is necessary incase missing bytes of pattern are all zeros
+                            if (C_symbol_offset_limit_lo = 0) and (unsigned(IN_LENGTH_RR) > 0) then
+                                V_incompatible_len := TRUE;
+                            else
+                                V_data_to_check( 63 downto  0) := IN_DATA_RR;
+                            end if;
 
-                    -- Collect Second half of pattern
-					when C_symbol_offset_word_uns + 1 =>
-                        -- If length of this data word is not long enough to include pattern remainder. Pattern cannot match 
-                        --      This is necessary incase missing bytes of pattern are all zeros
-                        if ((C_symbol_offset_limit_hi - 63) > (to_integer(unsigned(IN_LENGTH_RR)) * 8)) and (unsigned(IN_LENGTH_RR) > 0)  then
-                            V_incompatible_len := TRUE;
-                        else
-						    V_data_to_check(127 downto 64) := IN_DATA_RR;
-                        end if;
+                        -- Collect Second half of pattern
+			when C_symbol_offset_word_uns + 1 =>
+                            -- If length of this data word is not long enough to include pattern remainder. Pattern cannot match 
+                            --      This is necessary incase missing bytes of pattern are all zeros
+                            if ((C_symbol_offset_limit_hi - 63) > (to_integer(unsigned(IN_LENGTH_RR)) * 8)) and (unsigned(IN_LENGTH_RR) > 0)  then
+                                V_incompatible_len := TRUE;
+                            else
+			        V_data_to_check(127 downto 64) := IN_DATA_RR;
+                            end if;
 							
-					when others =>
-						null;
-				end case;
+			when others =>
+			    null;
+		    end case;
 
-                -- If pattern location present in packet
-                if V_incompatible_len = FALSE then
-                    -- If there is a pattern match then set variable and pass to buffer output
-                    case (V_data_to_check(C_symbol_offset_limit_hi downto C_symbol_offset_limit_lo)) is 
-                        when C_pattern_a =>
-                            V_output_buffer := C_detected_a;
+                    -- If pattern location present in packet
+                    if V_incompatible_len = FALSE then
+                        -- If there is a pattern match then set variable and pass to buffer output
+                        case (V_data_to_check(C_symbol_offset_limit_hi downto C_symbol_offset_limit_lo)) is 
+                            when C_pattern_a =>
+                                V_output_buffer := C_detected_a;
 
-                        when C_pattern_b =>
-                            V_output_buffer := C_detected_b;
+                            when C_pattern_b =>
+                                V_output_buffer := C_detected_b;
 
-                        when C_pattern_c =>
-                            V_output_buffer := C_detected_c;
+                            when C_pattern_c =>
+                                V_output_buffer := C_detected_c;
                             
-                        when C_pattern_d =>
-                            V_output_buffer := C_detected_d;
+                            when C_pattern_d =>
+                                V_output_buffer := C_detected_d;
 
-                        when others =>
-                            V_output_buffer := (others => '0');
+                            when others =>
+                                V_output_buffer := (others => '0');
 
-                    end case;
-                else
-                    V_output_buffer := (others => '0');
-                end if;
-            
-                -- If packet cycle is the EOP
-                if IN_EOP_RR = '1' then
-                    --Set out buffer if packet type correct
-                    if V_correct_packet_type = TRUE then
-                        OUT_BUFFER		    <= V_output_buffer;
+                        end case;
                     else
-                        OUT_BUFFER          <= (others => '0');
+                        V_output_buffer := (others => '0');
                     end if;
+            
+                    -- If packet cycle is the EOP
+                    if IN_EOP_RR = '1' then
+                        --Set out buffer if packet type correct
+                        if V_correct_packet_type = TRUE then
+                            OUT_BUFFER		    <= V_output_buffer;
+                        else
+                            OUT_BUFFER          <= (others => '0');
+                        end if;
 
-                    -- Reset Packet Variables
-                    PACKET_CYCLE_CNT 	    <= (others => '0');
-                    V_packet_transfer 	    := FALSE;
-                    V_incompatible_len      := FALSE;
-                    V_correct_packet_type   := FALSE;
+                        -- Reset Packet Variables
+                        PACKET_CYCLE_CNT 	    <= (others => '0');
+                        V_packet_transfer 	    := FALSE;
+                        V_incompatible_len      := FALSE;
+                        V_correct_packet_type   := FALSE;
 
-                end if;	
-			end if;
+                    end if;	
+	        end if;
         end if;
     end process pattern_match_proc;
 
